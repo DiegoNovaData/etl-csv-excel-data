@@ -1,0 +1,15 @@
+# Configuration for the Extract stage.
+# Source: DummyJSON public REST API (https://dummyjson.com/docs/products)
+
+source:
+  name: dummyjson_products
+  base_url: "https://dummyjson.com"
+  endpoint: "/products"
+  page_limit: 30 # records per page (API pagination)
+  timeout_seconds: 15
+  max_retries: 3
+
+paths:
+  raw_data_dir: "data/raw"
+  processed_data_dir: "data/processed"
+  output_data_dir: "data/output"
