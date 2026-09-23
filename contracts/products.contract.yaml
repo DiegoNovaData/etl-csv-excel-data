@@ -1,0 +1,129 @@
+dataContractSpecification: 1.1.0
+id: urn:datacontract:retail-etl:products
+info:
+  title: Products
+  version: 1.0.0
+  description: >
+    Current-state catalog of retail products, sourced from the DummyJSON
+    public API and normalized during the Transform stage. One row per
+    product, deduplicated to the latest raw extraction snapshot.
+  owner: etl-csv-excel-data
+  status: active
+servers:
+  output:
+    type: local
+    path: data/output/products.csv
+    format: csv
+    delimiter: ","
+models:
+  products:
+    description: One row per product, current-state grain.
+    type: table
+    fields:
+      product_id:
+        type: integer
+        required: true
+        unique: true
+        primaryKey: true
+        description: >
+          Source product identifier. Unique within a single snapshot only —
+          not stable as a long-term key across extraction runs (see
+          docs/data-lineage.md).
+      title:
+        type: string
+        required: true
+      description:
+        type: string
+      category:
+        type: string
+        required: true
+      brand:
+        type: string
+        required: false
+        description: Missing for some categories (e.g. groceries) — not always present.
+      sku:
+        type: string
+        required: true
+      price:
+        type: number
+        required: true
+        minimum: 0
+      discount_percentage:
+        type: number
+        minimum: 0
+        maximum: 100
+      price_with_discount:
+        type: number
+        minimum: 0
+        description: Derived — price * (1 - discount_percentage / 100).
+      rating:
+        type: number
+        minimum: 0
+        maximum: 5
+      stock:
+        type: integer
+        minimum: 0
+      availability_status:
+        type: string
+      minimum_order_quantity:
+        type: integer
+        minimum: 1
+      weight:
+        type: number
+        description: Unit not specified by the source API.
+      width:
+        type: number
+      height:
+        type: number
+      depth:
+        type: number
+      warranty_information:
+        type: string
+      shipping_information:
+        type: string
+      return_policy:
+        type: string
+      barcode:
+        type: string
+      qr_code_url:
+        type: string
+      thumbnail_url:
+        type: string
+      source_created_at:
+        type: timestamp
+        description: Record creation timestamp on the source system (synthetic).
+      source_updated_at:
+        type: timestamp
+        description: >
+          Record last-updated timestamp on the source system (synthetic; may
+          be a future date relative to extraction — see
+          docs/adr/0002-data-source-selection.md).
+      review_count:
+        type: integer
+        minimum: 0
+        description: Derived — count of reviews for this product.
+      avg_review_rating:
+        type: number
+        minimum: 0
+        maximum: 5
+        description: Derived — mean of reviews[].rating; may differ from `rating`.
+      extracted_at:
+        type: timestamp
+        required: true
+        description: Timestamp of the raw snapshot this row was built from.
+quality:
+  - type: text
+    description: >
+      product_id must be non-null and unique (Great Expectations, critical
+      suite — aborts the Transform run on failure).
+  - type: text
+    description: title and price must be non-null; price >= 0 (critical suite).
+  - type: text
+    description: >
+      rating in [0, 5], discount_percentage in [0, 100], stock >= 0, and
+      brand mostly non-null (>= 80%) are warning-level checks: logged but do
+      not block the pipeline. See src/quality/expectations.py and
+      docs/adr/0005-data-quality-great-expectations.md.
+tags:
+  - retail
+  - products

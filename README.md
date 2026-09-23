@@ -1,8 +1,9 @@
 # ETL CSV/Excel Data Pipeline
 
-A portfolio ETL project: extract, transform, and load retail data from a
-public API into analysis-ready CSV/Excel outputs. Currently implements the
-**Extract** stage; Transform and Load are in progress.
+An ETL project: extract, transform, and load retail data from a public API
+into analysis-ready CSV outputs. Extract, Transform, and Load are all
+implemented, with data quality checks (Great Expectations) and data contracts
+along the way.
 
 ---
 
@@ -20,8 +21,11 @@ configuration-driven design, tests, and decision documentation.
 | Stage | Status |
 |---|---|
 | Extract | ✅ Implemented |
-| Transform | 🔜 Planned |
-| Load | 🔜 Planned |
+| Transform | ✅ Implemented |
+| Load | ✅ Implemented (CSV) |
+
+The pipeline runs end-to-end: public API → raw JSON snapshot → validated,
+normalized CSV tables → published CSV deliverables.
 
 ### Architecture
 
@@ -29,29 +33,38 @@ configuration-driven design, tests, and decision documentation.
 flowchart LR
     A[DummyJSON API] -->|paginated GET| B[Extract]
     B -->|JSON snapshot| C[data/raw/]
-    C -.-> D["Transform (planned)"]
-    D -.-> E[data/processed/]
-    E -.-> F["Load (planned)"]
-    F -.-> G[data/output/]
+    C --> D["Transform\n+ Great Expectations"]
+    D --> E[data/processed/]
+    E --> F[Load]
+    F --> G["data/output/\n+ manifest.json"]
 ```
 
-See [docs/data-lineage.md](docs/data-lineage.md) for full detail.
+See [docs/data-lineage.md](docs/data-lineage.md) for full detail and
+[docs/entity-relationship-diagram.md](docs/entity-relationship-diagram.md)
+for the four-table schema (`products`, `product_reviews`, `product_tags`,
+`product_images`) that Transform/Load produce — designed to be replicated
+1:1 into a real database later.
 
 ### Project structure
 ```
 config/          Pipeline configuration (config.yaml)
+contracts/       Data contracts (Data Contract Specification YAML)
 data/
   raw/           Immutable raw snapshots (git-ignored)
-  processed/     Cleaned/normalized data (planned)
-  output/        Final deliverables (planned)
+  processed/     Normalized, validated tables (git-ignored)
+  output/        Published CSV deliverables + manifest.json (git-ignored)
 docs/
   adr/           Architecture Decision Records
   runbooks/      Operational runbooks
   data-lineage.md
   data-dictionary.md
+  entity-relationship-diagram.md
 logs/            Rotating log files (git-ignored)
 src/
   extract/       Extract stage source code
+  transform/     Transform stage source code
+  load/          Load stage source code
+  quality/       Great Expectations data quality checks
   utils/         Shared utilities (logging, etc.)
 tests/           Unit tests
 ```
@@ -70,14 +83,17 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-**Run the extraction**:
+**Run the full pipeline**:
 ```bash
-python -m src.extract.extract_dummyjson
+python -m src.extract.extract_dummyjson     # API -> data/raw/*.json
+python -m src.transform.transform_products  # data/raw/ -> data/processed/*.csv (+ quality checks)
+python -m src.load.load_products            # data/processed/ -> data/output/*.csv + manifest.json
 ```
-This fetches the full product catalog (~194 records) and writes a timestamped
-snapshot to `data/raw/products_raw_<UTC_TIMESTAMP>.json`. See the
-[extract runbook](docs/runbooks/extract-runbook.md) for details,
-troubleshooting, and scheduling.
+Extract fetches the full product catalog (~194 records) into a timestamped
+snapshot. Transform normalizes it into four tables and validates it with
+Great Expectations. Load publishes the validated tables as the final CSV
+deliverables. See the runbooks linked below for details, troubleshooting,
+and scheduling of each stage.
 
 **Run the tests**:
 ```bash
@@ -86,24 +102,31 @@ pytest -q
 
 ### Documentation
 - [CHANGELOG.md](CHANGELOG.md) — version history
-- [docs/adr/](docs/adr/) — architecture decisions (why the source and storage
-  format were chosen)
-- [docs/runbooks/extract-runbook.md](docs/runbooks/extract-runbook.md) —
-  how to run and troubleshoot the Extract stage
+- [docs/adr/](docs/adr/) — architecture decisions (data source, raw storage
+  format, data contracts, data quality approach)
+- Runbooks: [Extract](docs/runbooks/extract-runbook.md) ·
+  [Transform](docs/runbooks/transform-runbook.md) ·
+  [Load](docs/runbooks/load-runbook.md)
 - [docs/data-lineage.md](docs/data-lineage.md) — end-to-end data flow
 - [docs/data-dictionary.md](docs/data-dictionary.md) — field-by-field schema
   reference for the raw layer
+- [docs/entity-relationship-diagram.md](docs/entity-relationship-diagram.md) —
+  the four-table schema produced by Transform/Load
+- [`contracts/`](contracts/) — per-table data contracts (Data Contract
+  Specification YAML)
 
 ### Roadmap
-- **Transform**: flatten nested fields (`dimensions`, `meta`, `reviews`), type
-  validation, data quality checks, output to `data/processed/`.
-- **Load**: shape and export curated CSV/Excel deliverables to
-  `data/output/`.
+- Migrate data contracts from YAML documentation to Pydantic models enforced
+  at runtime (tracked as tech debt in
+  [ADR 0004](docs/adr/0004-data-contracts-approach.md)).
+- Historical/trend analysis across multiple snapshots (currently
+  current-state grain only — see [docs/data-lineage.md](docs/data-lineage.md)).
 
 ### About this project
-This repository is part of a freelance/portfolio effort to demonstrate ETL
-skills (data extraction, cleaning, and reporting with CSV/Excel/JSON). Feedback
-and suggestions are welcome via issues.
+This repository demonstrates practical ETL engineering skills: data
+extraction, normalization, automated data quality checks, and reporting with
+CSV/JSON, backed by decision documentation (ADRs), operational runbooks, and
+data contracts. Feedback and suggestions are welcome via issues.
 
 ---
 
@@ -122,8 +145,11 @@ automatizadas y documentación de decisiones.
 | Etapa | Estado |
 |---|---|
 | Extract | ✅ Implementada |
-| Transform | 🔜 Planeada |
-| Load | 🔜 Planeada |
+| Transform | ✅ Implementada |
+| Load | ✅ Implementada (CSV) |
+
+El pipeline corre de extremo a extremo: API pública → snapshot JSON crudo →
+tablas CSV normalizadas y validadas → entregables CSV publicados.
 
 ### Arquitectura
 
@@ -131,29 +157,38 @@ automatizadas y documentación de decisiones.
 flowchart LR
     A[API DummyJSON] -->|GET paginado| B[Extract]
     B -->|snapshot JSON| C[data/raw/]
-    C -.-> D["Transform (planeado)"]
-    D -.-> E[data/processed/]
-    E -.-> F["Load (planeado)"]
-    F -.-> G[data/output/]
+    C --> D["Transform\n+ Great Expectations"]
+    D --> E[data/processed/]
+    E --> F[Load]
+    F --> G["data/output/\n+ manifest.json"]
 ```
 
-Ver [docs/data-lineage.md](docs/data-lineage.md) para el detalle completo.
+Ver [docs/data-lineage.md](docs/data-lineage.md) para el detalle completo y
+[docs/entity-relationship-diagram.md](docs/entity-relationship-diagram.md)
+para el esquema de las cuatro tablas (`products`, `product_reviews`,
+`product_tags`, `product_images`) que produce Transform/Load — diseñado para
+replicarse 1:1 en una base de datos real más adelante.
 
 ### Estructura del proyecto
 ```
 config/          Configuración del pipeline (config.yaml)
+contracts/       Contratos de datos (YAML, Data Contract Specification)
 data/
   raw/           Snapshots crudos e inmutables (ignorado por git)
-  processed/     Datos limpios/normalizados (planeado)
-  output/        Entregables finales (planeado)
+  processed/     Tablas normalizadas y validadas (ignorado por git)
+  output/        Entregables CSV publicados + manifest.json (ignorado por git)
 docs/
   adr/           Registros de decisiones de arquitectura (ADR)
   runbooks/      Runbooks operativos
   data-lineage.md
   data-dictionary.md
+  entity-relationship-diagram.md
 logs/            Archivos de log rotativos (ignorado por git)
 src/
   extract/       Código de la etapa Extract
+  transform/     Código de la etapa Transform
+  load/          Código de la etapa Load
+  quality/       Validaciones de calidad con Great Expectations
   utils/         Utilidades compartidas (logging, etc.)
 tests/           Pruebas unitarias
 ```
@@ -172,14 +207,17 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-**Ejecutar la extracción**:
+**Ejecutar el pipeline completo**:
 ```bash
-python -m src.extract.extract_dummyjson
+python -m src.extract.extract_dummyjson     # API -> data/raw/*.json
+python -m src.transform.transform_products  # data/raw/ -> data/processed/*.csv (+ validación de calidad)
+python -m src.load.load_products            # data/processed/ -> data/output/*.csv + manifest.json
 ```
-Esto descarga el catálogo completo (~194 registros) y escribe un snapshot con
-timestamp en `data/raw/products_raw_<UTC_TIMESTAMP>.json`. Ver el
-[runbook de extracción](docs/runbooks/extract-runbook.md) para más detalle,
-resolución de problemas y programación de ejecuciones.
+Extract descarga el catálogo completo (~194 registros) en un snapshot con
+timestamp. Transform lo normaliza en cuatro tablas y lo valida con Great
+Expectations. Load publica las tablas validadas como entregables CSV finales.
+Ver los runbooks abajo para más detalle, resolución de problemas y
+programación de cada etapa.
 
 **Ejecutar las pruebas**:
 ```bash
@@ -188,23 +226,30 @@ pytest -q
 
 ### Documentación
 - [CHANGELOG.md](CHANGELOG.md) — historial de versiones
-- [docs/adr/](docs/adr/) — decisiones de arquitectura (por qué se eligió la
-  fuente y el formato de almacenamiento)
-- [docs/runbooks/extract-runbook.md](docs/runbooks/extract-runbook.md) — cómo
-  ejecutar y resolver problemas de la etapa Extract
+- [docs/adr/](docs/adr/) — decisiones de arquitectura (fuente de datos,
+  formato de almacenamiento crudo, contratos de datos, enfoque de calidad)
+- Runbooks: [Extract](docs/runbooks/extract-runbook.md) ·
+  [Transform](docs/runbooks/transform-runbook.md) ·
+  [Load](docs/runbooks/load-runbook.md)
 - [docs/data-lineage.md](docs/data-lineage.md) — flujo de datos de extremo a
   extremo
 - [docs/data-dictionary.md](docs/data-dictionary.md) — referencia de esquema
   campo por campo de la capa cruda
+- [docs/entity-relationship-diagram.md](docs/entity-relationship-diagram.md) —
+  el esquema de cuatro tablas que produce Transform/Load
+- [`contracts/`](contracts/) — contratos de datos por tabla (YAML, Data
+  Contract Specification)
 
 ### Hoja de ruta
-- **Transform**: aplanar campos anidados (`dimensions`, `meta`, `reviews`),
-  validación de tipos, controles de calidad de datos, salida a
-  `data/processed/`.
-- **Load**: dar forma y exportar entregables curados en CSV/Excel a
-  `data/output/`.
+- Migrar los contratos de datos de documentación YAML a modelos Pydantic
+  aplicados en tiempo de ejecución (deuda técnica registrada en
+  [ADR 0004](docs/adr/0004-data-contracts-approach.md)).
+- Análisis histórico/de tendencias entre múltiples snapshots (hoy el grano es
+  solo estado actual — ver [docs/data-lineage.md](docs/data-lineage.md)).
 
 ### Sobre este proyecto
-Este repositorio es parte de un esfuerzo freelance/portafolio para demostrar
-habilidades de ETL (extracción, limpieza y reportería de datos con
-CSV/Excel/JSON). Comentarios y sugerencias son bienvenidos vía issues.
+Este repositorio demuestra habilidades prácticas de ingeniería ETL:
+extracción de datos, normalización, controles de calidad automatizados y
+reportería con CSV/JSON, respaldado por documentación de decisiones (ADRs),
+runbooks operativos y contratos de datos. Comentarios y sugerencias son
+bienvenidos vía issues.

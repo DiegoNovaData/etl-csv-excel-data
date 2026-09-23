@@ -1,0 +1,38 @@
+dataContractSpecification: 1.1.0
+id: urn:datacontract:retail-etl:product-images
+info:
+  title: Product Images
+  version: 1.0.0
+  description: >
+    Bridge table normalizing the source API's multivalued `images[]` field —
+    one row per (product, image).
+  owner: etl-csv-excel-data
+  status: active
+servers:
+  output:
+    type: local
+    path: data/output/product_images.csv
+    format: csv
+    delimiter: ","
+models:
+  product_images:
+    description: One row per product image.
+    type: table
+    fields:
+      product_id:
+        type: integer
+        required: true
+        references: products.product_id
+      image_url:
+        type: string
+        required: true
+        description: >
+          Not declared as part of a composite primary key with product_id:
+          duplicate image URLs for the same product are not structurally
+          impossible and are not worth rejecting.
+quality:
+  - type: text
+    description: product_id must reference an existing row in products.product_id.
+tags:
+  - retail
+  - images
