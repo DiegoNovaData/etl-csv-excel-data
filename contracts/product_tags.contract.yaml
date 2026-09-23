@@ -1,0 +1,39 @@
+dataContractSpecification: 1.1.0
+id: urn:datacontract:retail-etl:product-tags
+info:
+  title: Product Tags
+  version: 1.0.0
+  description: >
+    Bridge table normalizing the source API's multivalued `tags[]` field —
+    one row per (product, tag) pair.
+  owner: etl-csv-excel-data
+  status: active
+servers:
+  output:
+    type: local
+    path: data/output/product_tags.csv
+    format: csv
+    delimiter: ","
+models:
+  product_tags:
+    description: One row per (product, tag).
+    type: table
+    fields:
+      product_id:
+        type: integer
+        required: true
+        primaryKey: true
+        references: products.product_id
+      tag:
+        type: string
+        required: true
+        primaryKey: true
+        description: A product cannot repeat the same tag, hence the composite primary key.
+quality:
+  - type: text
+    description: (product_id, tag) must be unique.
+  - type: text
+    description: product_id must reference an existing row in products.product_id.
+tags:
+  - retail
+  - tags
